@@ -12,11 +12,31 @@ func CreateAccount(username string, password string) (uid uint, err error) {
 	return user.ID, nil
 }
 
-func QueryAccount(username string, password string) (user *Account, existed bool) {
+func QueryAccount(username string) (user *Account, existed bool) {
+	var u Account
 	result := DB.Where(
-		"username = ? AND password = ?", username, password).First(user)
+		"username = ?", username).First(&u)
 	if result.Error != nil {
 		return nil, false
 	}
-	return user, true
+	return &u, true
+}
+
+func GetFollowsByUID(uid uint) int64 {
+	result := DB.Model(&Follower{}).Where("FollowerId = ?", uid)
+	return result.RowsAffected
+}
+
+func GetFollowersByUID(uid uint) int64 {
+	result := DB.Model(&Follower{}).Where("Id = ?", uid)
+	return result.RowsAffected
+}
+
+func CreateFollower(id uint, followerId uint) (succeed bool) {
+	follower := Follower{
+		Id:         id,
+		FollowerId: followerId,
+	}
+	result := DB.Create(&follower)
+	return result.Error == nil
 }

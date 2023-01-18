@@ -7,7 +7,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/RaymondCode/simple-demo/controller"
+	"github.com/PCBismarck/DouyinServer/controller"
 )
 
 var chatConnMap = sync.Map{}

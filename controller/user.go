@@ -2,25 +2,12 @@ package controller
 
 import (
 	"net/http"
-	"sync/atomic"
 
+	"github.com/PCBismarck/DouyinServer/toolkit"
 	"github.com/gin-gonic/gin"
 )
 
-// usersLoginInfo use map to store user info, and key is username+password for demo
-// user data will be cleared every time the server starts
-// test data: username=zhanglei, password=douyin
-var usersLoginInfo = map[string]User{
-	"zhangleidouyin": {
-		Id:            1,
-		Name:          "zhanglei",
-		FollowCount:   10,
-		FollowerCount: 5,
-		IsFollow:      true,
-	},
-}
-
-var userIdSequence = int64(1)
+const PWD_SHORTEST_LEN = 5
 
 type UserLoginResponse struct {
 	Response
@@ -33,52 +20,72 @@ type UserResponse struct {
 	User User `json:"user"`
 }
 
+var usersLoginInfo = map[string]User{
+	"zhangleidouyin": {
+		Id:            1,
+		Name:          "zhanglei",
+		FollowCount:   10,
+		FollowerCount: 5,
+		IsFollow:      true,
+	},
+}
+
 func Register(c *gin.Context) {
 	username := c.Query("username")
 	password := c.Query("password")
 
-	token := username + password
-
-	if _, exist := usersLoginInfo[token]; exist {
+	_, existed := toolkit.QueryAccount(username)
+	if existed {
 		c.JSON(http.StatusOK, UserLoginResponse{
 			Response: Response{StatusCode: 1, StatusMsg: "User already exist"},
 		})
-	} else {
-		atomic.AddInt64(&userIdSequence, 1)
-		newUser := User{
-			Id:   userIdSequence,
-			Name: username,
-		}
-		usersLoginInfo[token] = newUser
-		c.JSON(http.StatusOK, UserLoginResponse{
-			Response: Response{StatusCode: 0},
-			UserId:   userIdSequence,
-			Token:    username + password,
-		})
+		return
 	}
+	if len(password) < PWD_SHORTEST_LEN {
+		c.JSON(http.StatusOK, UserLoginResponse{
+			Response: Response{StatusCode: 1, StatusMsg: "Invaild password length"},
+		})
+		return
+	}
+	id, err := toolkit.CreateAccount(username, password)
+	if err != nil {
+		c.JSON(http.StatusOK, UserLoginResponse{
+			Response: Response{StatusCode: 1, StatusMsg: "Create Account failed"},
+		})
+		return
+	}
+	token, _ := toolkit.GenerateToken(id, username, password)
+	toolkit.TokenManger.Store(id, token)
+	c.JSON(http.StatusOK, UserLoginResponse{
+		Response: Response{StatusCode: 0},
+		UserId:   int64(id),
+		Token:    token,
+	})
 }
 
 func Login(c *gin.Context) {
 	//示例url
 	//"/douyin/user/login/?username=zhanglei&password=douyin"
-	// username := c.Query("username")
-	// password := c.Query("password")
-	// user, exist := QueryAccount(username, password)
-	// if exist {
-	// 	tokenStr := GenerateToken(user.ID)
-	// }
-
-	token := username + password
-	// fmt.Printf("token: %v\n", token)
-	if user, exist := usersLoginInfo[token]; exist {
-		c.JSON(http.StatusOK, UserLoginResponse{
-			Response: Response{StatusCode: 0},
-			UserId:   user.Id,
-			Token:    token,
-		})
+	username := c.Query("username")
+	password := c.Query("password")
+	user, exist := toolkit.QueryAccount(username)
+	if exist && password == user.Password {
+		tokenStr, err := toolkit.GenerateToken(user.ID, user.Username, user.Password)
+		if err != nil {
+			c.JSON(http.StatusOK, UserLoginResponse{
+				Response: Response{StatusCode: 1, StatusMsg: "get token failed"},
+			})
+		} else {
+			toolkit.TokenManger.Store(user.ID, tokenStr)
+			c.JSON(http.StatusOK, UserLoginResponse{
+				Response: Response{StatusCode: 0},
+				UserId:   int64(user.ID),
+				Token:    tokenStr,
+			})
+		}
 	} else {
 		c.JSON(http.StatusOK, UserLoginResponse{
-			Response: Response{StatusCode: 1, StatusMsg: "User doesn't exist"},
+			Response: Response{StatusCode: 1, StatusMsg: "User doesn't exist or wrong password"},
 		})
 	}
 }
@@ -86,15 +93,32 @@ func Login(c *gin.Context) {
 func UserInfo(c *gin.Context) {
 	//示例url "/douyin/user/?user_id=1&token=zhangleidouyin"
 	token := c.Query("token")
-
-	if user, exist := usersLoginInfo[token]; exist {
+	ttc, err := toolkit.ParseToken(token)
+	if err != nil {
 		c.JSON(http.StatusOK, UserResponse{
-			Response: Response{StatusCode: 0},
-			User:     user,
+			Response: Response{StatusCode: 1, StatusMsg: "Invaild token"},
 		})
-	} else {
+		return
+	}
+
+	ok, _ := toolkit.VerifyToken(token)
+	if !ok {
 		c.JSON(http.StatusOK, UserResponse{
 			Response: Response{StatusCode: 1, StatusMsg: "User doesn't exist"},
 		})
+		return
 	}
+
+	// account, exist := toolkit.QueryAccount(ttc.Username)
+	var user = User{
+		Id:            int64(ttc.Id),
+		Name:          ttc.Username,
+		FollowCount:   toolkit.GetFollowsByUID(ttc.Id),
+		FollowerCount: toolkit.GetFollowersByUID(ttc.Id),
+		IsFollow:      true,
+	}
+	c.JSON(http.StatusOK, UserResponse{
+		Response: Response{StatusCode: 0},
+		User:     user,
+	})
 }

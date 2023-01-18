@@ -1,11 +1,13 @@
 package main
 
 import (
-	"github.com/RaymondCode/simple-demo/service"
+	"github.com/PCBismarck/DouyinServer/service"
+	"github.com/PCBismarck/DouyinServer/toolkit"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	toolkit.InitDB()
 	go service.RunMessageServer()
 
 	r := gin.Default()

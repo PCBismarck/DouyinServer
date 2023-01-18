@@ -1,8 +1,10 @@
 package controller
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/PCBismarck/DouyinServer/toolkit"
+	"github.com/gin-gonic/gin"
 )
 
 type UserListResponse struct {
@@ -14,7 +16,8 @@ type UserListResponse struct {
 func RelationAction(c *gin.Context) {
 	token := c.Query("token")
 
-	if _, exist := usersLoginInfo[token]; exist {
+	if ok, _ := toolkit.VerifyToken(token); ok {
+		//
 		c.JSON(http.StatusOK, Response{StatusCode: 0})
 	} else {
 		c.JSON(http.StatusOK, Response{StatusCode: 1, StatusMsg: "User doesn't exist"})

@@ -31,6 +31,7 @@ func InitDB() {
 		pwd:       "123456",
 		protocol:  "tcp",
 		address:   "127.0.0.1",
+		dbname:    "douyin",
 		port:      "3306",
 		charset:   "utf8mb4",
 		parseTime: "True",
