@@ -9,7 +9,7 @@ import (
 )
 
 type TikTokClaims struct {
-	Id       uint
+	Id       int64
 	Username string `json:"username"`
 	Password string `json:"password"`
 	jwt.RegisteredClaims
@@ -19,15 +19,15 @@ type TokenMap struct {
 	m sync.Map
 }
 
-func (t *TokenMap) Delete(key uint) {
+func (t *TokenMap) Delete(key int64) {
 	t.m.Delete(key)
 }
 
-func (t *TokenMap) Store(key uint, value string) {
+func (t *TokenMap) Store(key int64, value string) {
 	t.m.Store(key, value)
 }
 
-func (t *TokenMap) Load(key uint) (value string, ok bool) {
+func (t *TokenMap) Load(key int64) (value string, ok bool) {
 	v, ok := t.m.Load(key)
 	if v != nil {
 		value = v.(string)
@@ -50,16 +50,16 @@ func VerifyToken(tokenStr string) (ok bool, err error) {
 	return false, nil
 }
 
-func DeleteTokenByUid(uid uint) {
+func DeleteTokenByUid(uid int64) {
 	TokenManger.Delete(uid)
 }
 
-func StoreToken(uid uint, tokenStr string) {
+func StoreToken(uid int64, tokenStr string) {
 	TokenManger.Store(uid, tokenStr)
 }
 
 // use JWT to generate token
-func GenerateToken(id uint, username string, password string) (tokenStr string, err error) {
+func GenerateToken(id int64, username string, password string) (tokenStr string, err error) {
 	claims := TikTokClaims{
 		Id:       id,
 		Username: username,
@@ -96,4 +96,9 @@ func ParseToken(tokenStr string) (claims *TikTokClaims, err error) {
 		return nil, fmt.Errorf("bad claims")
 	}
 	return claims, nil
+}
+
+func GetUidByToken(tokenStr string) int64 {
+	ttc, _ := ParseToken(tokenStr)
+	return ttc.Id
 }

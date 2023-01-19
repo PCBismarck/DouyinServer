@@ -2,9 +2,11 @@ package controller
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"path/filepath"
+
+	"github.com/PCBismarck/DouyinServer/toolkit"
+	"github.com/gin-gonic/gin"
 )
 
 type VideoListResponse struct {
@@ -15,8 +17,7 @@ type VideoListResponse struct {
 // Publish check token then save upload file to public directory
 func Publish(c *gin.Context) {
 	token := c.PostForm("token")
-
-	if _, exist := usersLoginInfo[token]; !exist {
+	if ok, _ := toolkit.VerifyToken(token); ok {
 		c.JSON(http.StatusOK, Response{StatusCode: 1, StatusMsg: "User doesn't exist"})
 		return
 	}

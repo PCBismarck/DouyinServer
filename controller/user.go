@@ -70,13 +70,13 @@ func Login(c *gin.Context) {
 	password := c.Query("password")
 	user, exist := toolkit.QueryAccount(username)
 	if exist && password == user.Password {
-		tokenStr, err := toolkit.GenerateToken(user.ID, user.Username, user.Password)
+		tokenStr, err := toolkit.GenerateToken(int64(user.ID), user.Username, user.Password)
 		if err != nil {
 			c.JSON(http.StatusOK, UserLoginResponse{
 				Response: Response{StatusCode: 1, StatusMsg: "get token failed"},
 			})
 		} else {
-			toolkit.TokenManger.Store(user.ID, tokenStr)
+			toolkit.TokenManger.Store(int64(user.ID), tokenStr)
 			c.JSON(http.StatusOK, UserLoginResponse{
 				Response: Response{StatusCode: 0},
 				UserId:   int64(user.ID),
@@ -108,17 +108,21 @@ func UserInfo(c *gin.Context) {
 		})
 		return
 	}
-
-	// account, exist := toolkit.QueryAccount(ttc.Username)
-	var user = User{
-		Id:            int64(ttc.Id),
-		Name:          ttc.Username,
-		FollowCount:   toolkit.GetFollowsByUID(ttc.Id),
-		FollowerCount: toolkit.GetFollowersByUID(ttc.Id),
-		IsFollow:      true,
-	}
+	user := GetUserByUid(ttc.Id)
 	c.JSON(http.StatusOK, UserResponse{
 		Response: Response{StatusCode: 0},
-		User:     user,
+		User:     *user,
 	})
+}
+
+func GetUserByUid(uid int64) *User {
+	a := toolkit.GetAccountInfoByUID(uid)
+	user := User{
+		Id:            uid,
+		Name:          a.Username,
+		FollowCount:   a.FollowCount,
+		FollowerCount: a.FollowerCount,
+		IsFollow:      true,
+	}
+	return &user
 }

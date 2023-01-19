@@ -1,8 +1,12 @@
 package controller
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/PCBismarck/DouyinServer/toolkit"
+	"github.com/gin-gonic/gin"
 )
 
 type CommentListResponse struct {
@@ -15,33 +19,74 @@ type CommentActionResponse struct {
 	Comment Comment `json:"comment,omitempty"`
 }
 
-// CommentAction no practical effect, just check if token is valid
 func CommentAction(c *gin.Context) {
 	token := c.Query("token")
 	actionType := c.Query("action_type")
+	vid, _ := strconv.ParseInt(c.Query("video_id"), 10, 64)
 
-	if user, exist := usersLoginInfo[token]; exist {
-		if actionType == "1" {
+	if ok, _ := toolkit.VerifyToken(token); ok {
+		switch actionType {
+		case "1":
+			uid := toolkit.GetUidByToken(token)
 			text := c.Query("comment_text")
+			comment_id, err := toolkit.CreateComment(vid, uid, text)
+			if err != nil {
+				c.JSON(http.StatusOK, Response{
+					StatusCode: 1, StatusMsg: "Create comment failed"})
+				return
+			}
+			user := GetUserByUid(uid)
 			c.JSON(http.StatusOK, CommentActionResponse{Response: Response{StatusCode: 0},
 				Comment: Comment{
-					Id:         1,
-					User:       user,
+					Id:         comment_id,
+					User:       *user,
 					Content:    text,
-					CreateDate: "05-01",
+					CreateDate: time.Now().Format("01-02"),
 				}})
-			return
+		case "2":
+			comment_id, _ := strconv.ParseInt(c.Query("comment_id"), 10, 64)
+			ok := toolkit.DeleteComment(vid, comment_id)
+			if ok {
+				c.JSON(http.StatusOK, Response{StatusCode: 0})
+			} else {
+				c.JSON(http.StatusOK, Response{
+					StatusCode: 1,
+					StatusMsg:  "Delete comment failed"})
+			}
 		}
-		c.JSON(http.StatusOK, Response{StatusCode: 0})
 	} else {
 		c.JSON(http.StatusOK, Response{StatusCode: 1, StatusMsg: "User doesn't exist"})
 	}
 }
 
-// CommentList all videos have same demo comment list
 func CommentList(c *gin.Context) {
+	token := c.Query("token")
+	vid, _ := strconv.ParseInt(c.Query("video_id"), 10, 64)
+	if ok, _ := toolkit.VerifyToken(token); !ok {
+		c.JSON(http.StatusOK, CommentListResponse{
+			Response: Response{StatusCode: 0},
+		})
+		return
+	}
+	comentInfo, err := toolkit.GetCommentIdByVID(vid)
+	if err != nil {
+		c.JSON(http.StatusOK, CommentListResponse{
+			Response: Response{StatusCode: 0, StatusMsg: "Get comment list failed"},
+		})
+		return
+	}
+	var comentList []Comment
+	for _, v := range comentInfo {
+		new_comment := Comment{
+			Id:         int64(v.ID),
+			User:       *GetUserByUid(v.Uid),
+			Content:    v.Content,
+			CreateDate: v.CreatedAt.Format("01-02"),
+		}
+		comentList = append(comentList, new_comment)
+	}
 	c.JSON(http.StatusOK, CommentListResponse{
 		Response:    Response{StatusCode: 0},
-		CommentList: DemoComments,
+		CommentList: comentList,
 	})
 }
