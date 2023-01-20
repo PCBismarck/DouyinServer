@@ -24,7 +24,6 @@ func (c *mysqlConn) GetDSN() string {
 }
 
 var DB *gorm.DB
-var ServerAddr = "192.168.1.8:8080"
 
 func InitDB() {
 	dsn := (&mysqlConn{
