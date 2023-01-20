@@ -1,9 +1,10 @@
 package controller
 
 import (
-	"fmt"
 	"net/http"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 
 	"github.com/PCBismarck/DouyinServer/toolkit"
 	"github.com/gin-gonic/gin"
@@ -17,7 +18,7 @@ type VideoListResponse struct {
 // Publish check token then save upload file to public directory
 func Publish(c *gin.Context) {
 	token := c.PostForm("token")
-	if ok, _ := toolkit.VerifyToken(token); ok {
+	if ok, _ := toolkit.VerifyToken(token); !ok {
 		c.JSON(http.StatusOK, Response{StatusCode: 1, StatusMsg: "User doesn't exist"})
 		return
 	}
@@ -31,11 +32,10 @@ func Publish(c *gin.Context) {
 		return
 	}
 
-	filename := filepath.Base(data.Filename)
-	user := usersLoginInfo[token]
-	finalName := fmt.Sprintf("%d_%s", user.Id, filename)
-	saveFile := filepath.Join("./public/", finalName)
-	if err := c.SaveUploadedFile(data, saveFile); err != nil {
+	author_id := toolkit.GetUidByToken(token)
+	title := filepath.Base(data.Filename)
+	vid, err := toolkit.CreateVideoInfo(author_id, BaseUrl, title)
+	if err != nil {
 		c.JSON(http.StatusOK, Response{
 			StatusCode: 1,
 			StatusMsg:  err.Error(),
@@ -43,18 +43,53 @@ func Publish(c *gin.Context) {
 		return
 	}
 
+	fileName := strconv.Itoa(int(vid))
+	saveFile := filepath.Join("./public/video/", fileName+".mp4")
+	coverPath := filepath.Join("./public/cover/", fileName+".png")
+	command := exec.Command(
+		"ffmpeg", "-i", saveFile, "-ss", "00:00:00", "-frames:v", "1", coverPath)
+	if err := c.SaveUploadedFile(data, saveFile); err != nil {
+		c.JSON(http.StatusOK, Response{
+			StatusCode: 1,
+			StatusMsg:  err.Error(),
+		})
+		toolkit.DeleteVideo(vid)
+		return
+	}
+	if out, err_cover := command.CombinedOutput(); err_cover != nil {
+		c.JSON(http.StatusOK, Response{
+			StatusCode: 1,
+			StatusMsg:  err_cover.Error() + "\n" + string(out),
+		})
+		toolkit.DeleteVideo(vid)
+		return
+	}
 	c.JSON(http.StatusOK, Response{
 		StatusCode: 0,
-		StatusMsg:  finalName + " uploaded successfully",
+		StatusMsg:  title + " uploaded successfully",
 	})
 }
 
-// PublishList all users have same publish video list
 func PublishList(c *gin.Context) {
+	token := c.Query("token")
+	uid, _ := strconv.ParseInt(c.Query("user_id"), 10, 64)
+
+	if ok, _ := toolkit.VerifyToken(token); !ok {
+		c.JSON(http.StatusOK, Response{StatusCode: 1, StatusMsg: "User doesn't exist"})
+		return
+	}
+	vlist, err := toolkit.GetPublishListByUID(uid)
+	if err != nil {
+		c.JSON(http.StatusOK, Response{
+			StatusCode: 1, StatusMsg: "Get publish list falied"})
+		return
+	}
+
+	videos := TransVideoInfoToVideo(vlist, uid)
 	c.JSON(http.StatusOK, VideoListResponse{
 		Response: Response{
 			StatusCode: 0,
 		},
-		VideoList: DemoVideos,
+		VideoList: videos,
 	})
 }

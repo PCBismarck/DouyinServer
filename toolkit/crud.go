@@ -2,6 +2,8 @@ package toolkit
 
 import (
 	"errors"
+	"strconv"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -93,7 +95,7 @@ func IsAFollowB(Aid int64, Bid int64) bool {
 		Id:         Bid,
 		FollowerId: Aid,
 	}
-	result := DB.First(followerInfo)
+	result := DB.First(&followerInfo)
 	return !errors.Is(result.Error, gorm.ErrRecordNotFound)
 }
 
@@ -154,51 +156,69 @@ func CreateFavorite(vid int64, uid int64) (succeed bool) {
 		Uid: uid,
 	}
 	result := DB.Create(&favorite)
-	var video VideoInfo
-	DB.First(&video, vid)
-	video.FavoriteCount++
-	DB.Save(&video)
-	return result.Error == nil
+	if result.Error == nil {
+		var video VideoInfo
+		DB.First(&video, vid)
+		video.FavoriteCount++
+		DB.Save(&video)
+		return true
+	}
+	return false
 }
 
 func DeleteFavorite(vid int64, uid int64) (succeed bool) {
-	favorite := Favorite{
-		Vid: vid,
-		Uid: uid,
+	result := DB.Where("vid = ? AND uid = ?", vid, uid).Delete(&Favorite{})
+	if result.Error == nil {
+		var video VideoInfo
+		DB.First(&video, vid)
+		video.FavoriteCount--
+		DB.Save(&video)
+		return true
 	}
-	result := DB.Delete(&favorite)
-	var video VideoInfo
-	DB.First(&video, vid)
-	video.FavoriteCount--
-	DB.Save(&video)
-	return result.Error == nil
+	return false
 }
 
 func GetFavoriteList(uid int64) ([]Favorite, error) {
 	var favoriteList []Favorite
-	result := DB.Where("uid = ?", uid).Find(favoriteList)
+	result := DB.Where("uid = ?", uid).Find(&favoriteList)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 	return favoriteList, nil
 }
 
+func IsUserFavoriteVideo(uid int64, vid int64) bool {
+	favorite := Favorite{
+		Uid: uid,
+		Vid: vid,
+	}
+	result := DB.First(&favorite)
+	return !errors.Is(result.Error, gorm.ErrRecordNotFound)
+}
+
 func CreateVideoInfo(
 	author_id int64,
-	play_url string,
-	cover_url string,
-	title string) (comment_id int64, err error) {
+	base_url string,
+	title string) (vid int64, err error) {
 	videoInfo := VideoInfo{
 		AuthorId: author_id,
-		PlayUrl:  play_url,
-		CoverUrl: cover_url,
 		Title:    title,
 	}
 	result := DB.Create(&videoInfo)
 	if result.Error != nil {
 		return 0, result.Error
 	}
+	DB.First(&videoInfo)
+	filename := strconv.Itoa(int(videoInfo.ID))
+	videoInfo.PlayUrl = base_url + "video/" + filename + ".mp4"
+	videoInfo.CoverUrl = base_url + "cover/" + filename + ".png"
+	DB.Save(&videoInfo)
 	return int64(videoInfo.ID), nil
+}
+
+func DeleteVideo(vid int64) (succeed bool) {
+	result := DB.Delete(&VideoInfo{}, vid)
+	return result.Error == nil
 }
 
 func GetVideoInfoByVID(vid int64) (*VideoInfo, error) {
@@ -208,4 +228,23 @@ func GetVideoInfoByVID(vid int64) (*VideoInfo, error) {
 		return nil, result.Error
 	}
 	return &video, nil
+}
+
+func GetPublishListByUID(uid int64) ([]VideoInfo, error) {
+	var videoList []VideoInfo
+	result := DB.Where("author_id = ?", uid).Find(&videoList)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return videoList, nil
+}
+
+func GetVideoBeforeTimeStamp(latest int64) ([]VideoInfo, error) {
+	time := time.Unix(latest, 0)
+	var videoList []VideoInfo
+	result := DB.Where("created_at < ?", time).Limit(30).Find(&videoList)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return videoList, nil
 }

@@ -22,9 +22,9 @@ type VideoInfo struct {
 	AuthorId      int64
 	PlayUrl       string
 	CoverUrl      string
-	Title         string
 	FavoriteCount int64
 	CommentCount  int64
+	Title         string
 }
 
 type Favorite struct {

@@ -30,7 +30,7 @@ func FavoriteAction(c *gin.Context) {
 		}
 	default:
 	}
-	c.JSON(http.StatusOK, Response{StatusCode: 1, StatusMsg: "User doesn't exist"})
+	c.JSON(http.StatusOK, Response{StatusCode: 1, StatusMsg: "favorite action failed"})
 }
 
 func FavoriteList(c *gin.Context) {
