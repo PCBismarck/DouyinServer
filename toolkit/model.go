@@ -38,3 +38,15 @@ type CommentInfo struct {
 	Uid     int64
 	Content string
 }
+type User struct {
+	Uid            string `json:"uid,omitempty"`
+	Name           string `json:"name,omitempty"`
+	Follows        []User `json:"follows,omitempty"`
+	Followers      []User `json:"~follows,omitempty"`
+	Friends        []User `json:"friends,omitempty"`
+	FollowsCount   int64  `json:"count(follows)"`
+	FollowersCount int64  `json:"count(~follows)"`
+}
+type UserList struct {
+	FollowList []User `json:"followlist,omitempty"`
+}
