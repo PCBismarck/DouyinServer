@@ -2,6 +2,11 @@ package toolkit
 
 import (
 	"fmt"
+	"github.com/dgraph-io/dgo/v210"
+	"github.com/dgraph-io/dgo/v210/protos/api"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"log"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -24,6 +29,7 @@ func (c *mysqlConn) GetDSN() string {
 }
 
 var DB *gorm.DB
+var DGO *dgo.Dgraph
 
 func InitDB() {
 	dsn := (&mysqlConn{
@@ -41,4 +47,15 @@ func InitDB() {
 		panic(err)
 	}
 	DB = db
+}
+func InitDGO() {
+	// Dial a gRPC connection. The address to dial to can be configured when
+	// setting up the dgraph cluster.
+	d, err := grpc.Dial("localhost:9080", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal(err)
+	}
+	DGO = dgo.NewDgraphClient(
+		api.NewDgraphClient(d),
+	)
 }
